@@ -56,33 +56,19 @@ jobs:
             fi
             echo "Using REPO_URL: ${REPO_URL%%@*}" # Show URL without PAT for security
             
-            # Handle git repository setup using script
-            # First, get the script from the repo (clone to temp location if needed)
-            if [ -d $APP_DIR/.git ] && [ -f $APP_DIR/.github/workflows/deploy-git.sh ]; then
-              echo "Using existing deploy-git.sh script from $APP_DIR"
-              SCRIPT_PATH="$APP_DIR/.github/workflows/deploy-git.sh"
-            else
-              # Clone repo to get the script - use /opt since user has write access there
-              mkdir -p /opt/tmp-deploy-scripts
-              git clone "$REPO_URL" /opt/tmp-deploy-scripts
-              cd /opt/tmp-deploy-scripts
-              if git show-ref --verify --quiet refs/remotes/origin/prod 2>/dev/null; then
-                git checkout prod
-              fi
-              SCRIPT_PATH="/opt/tmp-deploy-scripts/.github/workflows/deploy-git.sh"
-              if [ ! -f "$SCRIPT_PATH" ]; then
-                echo "ERROR: deploy-git.sh not found at $SCRIPT_PATH"
-                exit 1
-              fi
+            # Get the deployment script from the repo
+            TEMP_BASE_DIR="/opt/deploy-temp"
+            TEMP_SCRIPT_DIR="$TEMP_BASE_DIR/$APP_NAME"
+            mkdir -p "$TEMP_BASE_DIR"
+            rm -rf "$TEMP_SCRIPT_DIR"
+            git clone "$REPO_URL" "$TEMP_SCRIPT_DIR"
+            cd "$TEMP_SCRIPT_DIR"
+            if git show-ref --verify --quiet refs/remotes/origin/prod 2>/dev/null; then
+              git checkout prod
             fi
-            
-            chmod +x "$SCRIPT_PATH"
-            "$SCRIPT_PATH" "$APP_NAME" "$APP_DIR" "$REPO_URL"
-            
-            # Clean up temp directory (only if it's not the app directory)
-            if [ -d /opt/tmp-deploy-scripts ] && [ "/opt/tmp-deploy-scripts" != "$APP_DIR" ]; then
-              rm -rf /opt/tmp-deploy-scripts 2>/dev/null || true
-            fi
+            chmod +x "$TEMP_SCRIPT_DIR/.github/workflows/deploy-git.sh"
+            "$TEMP_SCRIPT_DIR/.github/workflows/deploy-git.sh" "$APP_NAME" "$APP_DIR" "$REPO_URL"
+            rm -rf "$TEMP_SCRIPT_DIR"
             
             # Build and start Docker container first
             echo "Building and starting Docker container..."

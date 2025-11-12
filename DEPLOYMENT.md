@@ -28,7 +28,16 @@ sudo mkdir -p /opt/nashville-software-collective
 sudo chown bill-criminal:bill-criminal /opt/nashville-software-collective
 ```
 
-### 2. Configure Passwordless Sudo for Nginx Operations
+### 2. Create Deployment Temp Directory
+
+Create a dedicated directory for deployment temp files and grant write access to the deployment user:
+
+```bash
+sudo mkdir -p /opt/deploy-temp
+sudo chown -R bill-criminal:bill-criminal /opt/deploy-temp
+```
+
+### 3. Configure Passwordless Sudo for Nginx Operations
 
 The deployment pipeline needs to manage nginx configuration files. Configure passwordless sudo for nginx operations:
 
@@ -58,7 +67,7 @@ You should see the deploy-nginx.sh scripts listed in the output. Test that it wo
 sudo /opt/nashville-software-collective/.github/workflows/deploy-nginx.sh --help || echo "Script not found yet (will be available after first deployment)"
 ```
 
-### 3. GitHub Actions SSH Key (if not already done)
+### 4. GitHub Actions SSH Key (if not already done)
 
 If you haven't already set up SSH keys for GitHub Actions from the Resume project, you can reuse the existing key:
 
