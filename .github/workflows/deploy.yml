@@ -34,13 +34,24 @@ jobs:
             mkdir -p /opt/nashville-software-collective
             cd /opt/nashville-software-collective
             
-            # Clone repository if it doesn't exist, otherwise pull latest code
-            if [ ! -d .git ]; then
+            # Handle git repository setup
+            if [ -d .git ]; then
+              # Existing git repository - pull latest code
+              git fetch origin
+              git reset --hard origin/prod
+            elif [ "$(ls -A . 2>/dev/null)" ]; then
+              # Directory exists but is not a git repo - backup and clone fresh
+              echo "Directory exists but is not a git repository. Backing up and cloning fresh..."
+              cd ..
+              mv nashville-software-collective nashville-software-collective.backup.$(date +%s) 2>/dev/null || rm -rf nashville-software-collective
+              mkdir -p nashville-software-collective
+              cd nashville-software-collective
               git clone git@github.com:${{ github.repository }}.git .
               git checkout prod || git checkout -b prod
             else
-              git fetch origin
-              git reset --hard origin/prod
+              # Empty directory - clone fresh
+              git clone git@github.com:${{ github.repository }}.git .
+              git checkout prod || git checkout -b prod
             fi
             
             # Deploy nginx configuration
