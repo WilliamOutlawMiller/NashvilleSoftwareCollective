@@ -27,6 +27,9 @@ bill-criminal ALL=(ALL) NOPASSWD: /usr/bin/cp /opt/*/nginx-server.conf /etc/ngin
 bill-criminal ALL=(ALL) NOPASSWD: /usr/bin/ln -sf /etc/nginx/sites-available/* /etc/nginx/sites-enabled/*
 bill-criminal ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t
 bill-criminal ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx
+# Allow directory cleanup for deployment (only in /opt)
+bill-criminal ALL=(ALL) NOPASSWD: /bin/rm -rf /opt/nashville-software-collective
+bill-criminal ALL=(ALL) NOPASSWD: /bin/rm -rf /opt/williammiller-site
 ```
 
 Save and exit:

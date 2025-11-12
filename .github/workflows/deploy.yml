@@ -26,31 +26,35 @@ jobs:
       - name: Deploy to server
         run: |
           ssh -p ${{ secrets.SSH_PORT }} ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-            # Ensure GitHub is in known_hosts for SSH git operations
-            mkdir -p ~/.ssh
-            ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null || true
-            
             # Create directory if it doesn't exist
             mkdir -p /opt/nashville-software-collective
             cd /opt/nashville-software-collective
             
+            # Prepare git repository URL (use HTTPS, with PAT if available)
+            REPO_URL="https://github.com/${{ github.repository }}.git"
+            if [ -n "${{ secrets.GITHUB_PAT }}" ]; then
+              REPO_URL="https://${{ secrets.GITHUB_PAT }}@github.com/${{ github.repository }}.git"
+            fi
+            
             # Handle git repository setup
             if [ -d .git ]; then
               # Existing git repository - pull latest code
+              git remote set-url origin $REPO_URL || true
               git fetch origin
               git reset --hard origin/prod
+              git clean -fd
             elif [ "$(ls -A . 2>/dev/null)" ]; then
-              # Directory exists but is not a git repo - backup and clone fresh
-              echo "Directory exists but is not a git repository. Backing up and cloning fresh..."
+              # Directory exists but is not a git repo - clear and clone fresh
+              echo "Directory exists but is not a git repository. Clearing and cloning fresh..."
               cd ..
-              mv nashville-software-collective nashville-software-collective.backup.$(date +%s) 2>/dev/null || rm -rf nashville-software-collective
+              sudo rm -rf nashville-software-collective
               mkdir -p nashville-software-collective
               cd nashville-software-collective
-              git clone git@github.com:${{ github.repository }}.git .
+              git clone $REPO_URL .
               git checkout prod || git checkout -b prod
             else
               # Empty directory - clone fresh
-              git clone git@github.com:${{ github.repository }}.git .
+              git clone $REPO_URL .
               git checkout prod || git checkout -b prod
             fi
             
