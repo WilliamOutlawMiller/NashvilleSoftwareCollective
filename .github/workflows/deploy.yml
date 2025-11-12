@@ -59,15 +59,38 @@ jobs:
             # Handle git repository setup
             if [ -d .git ]; then
               echo "Updating existing git repository..."
-              if git remote get-url origin >/dev/null 2>&1; then
-                git remote set-url origin $REPO_URL
+              # Check if git repo is valid
+              if ! git rev-parse --git-dir >/dev/null 2>&1; then
+                echo "Git repository is corrupted. Clearing and cloning fresh..."
+                cd ..
+                sudo rm -rf $APP_NAME
+                mkdir -p $APP_NAME
+                cd $APP_NAME
+                git clone $REPO_URL .
+                git checkout prod || git checkout -b prod
               else
-                git remote add origin $REPO_URL
+                # Remove broken origin if it exists but is invalid
+                if ! git remote get-url origin >/dev/null 2>&1; then
+                  git remote remove origin 2>/dev/null || true
+                  git remote add origin $REPO_URL
+                else
+                  git remote set-url origin $REPO_URL
+                fi
+                git fetch origin || { 
+                  echo "ERROR: Failed to fetch from origin. Clearing and cloning fresh..."
+                  cd ..
+                  sudo rm -rf $APP_NAME
+                  mkdir -p $APP_NAME
+                  cd $APP_NAME
+                  git clone $REPO_URL .
+                  git checkout prod || git checkout -b prod
+                }
+                if [ -d .git ]; then
+                  git reset --hard origin/prod || { echo "ERROR: Failed to reset to origin/prod"; exit 1; }
+                  git clean -fd
+                  echo "Git repository updated successfully"
+                fi
               fi
-              git fetch origin || { echo "ERROR: Failed to fetch from origin"; exit 1; }
-              git reset --hard origin/prod || { echo "ERROR: Failed to reset to origin/prod"; exit 1; }
-              git clean -fd
-              echo "Git repository updated successfully"
             elif [ "$(ls -A . 2>/dev/null)" ]; then
               echo "Directory exists but is not a git repository. Clearing and cloning fresh..."
               cd ..
