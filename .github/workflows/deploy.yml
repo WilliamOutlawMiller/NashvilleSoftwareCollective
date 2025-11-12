@@ -26,11 +26,30 @@ jobs:
       - name: Deploy to server
         run: |
           ssh -p ${{ secrets.SSH_PORT }} ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+            # Ensure GitHub is in known_hosts for SSH git operations
+            mkdir -p ~/.ssh
+            ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null || true
+            
+            # Create directory if it doesn't exist
+            mkdir -p /opt/nashville-software-collective
             cd /opt/nashville-software-collective
             
-            # Pull latest code
-            git fetch origin
-            git reset --hard origin/prod
+            # Clone repository if it doesn't exist, otherwise pull latest code
+            if [ ! -d .git ]; then
+              git clone git@github.com:${{ github.repository }}.git .
+              git checkout prod || git checkout -b prod
+            else
+              git fetch origin
+              git reset --hard origin/prod
+            fi
+            
+            # Deploy nginx configuration
+            if [ -f nginx-server.conf ]; then
+              echo "Deploying nginx configuration..."
+              sudo cp nginx-server.conf /etc/nginx/sites-available/nashville-software-collective
+              sudo ln -sf /etc/nginx/sites-available/nashville-software-collective /etc/nginx/sites-enabled/nashville-software-collective
+              sudo nginx -t && sudo systemctl reload nginx || echo "Warning: nginx config test failed"
+            fi
             
             # Stop and remove existing container
             docker compose down || true

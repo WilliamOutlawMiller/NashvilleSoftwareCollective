@@ -15,106 +15,88 @@ This document provides instructions for setting up the Nashville Software Collec
 
 The server should already have Docker and Docker Compose installed (from the Resume site setup). If not, follow the installation steps in the Resume README.md.
 
-## Server Setup Instructions
+## One-Time Server Setup
+
+These steps only need to be done once on the server to enable automated deployments.
 
 ### 1. Create Application Directory
 
 ```bash
 sudo mkdir -p /opt/nashville-software-collective
 sudo chown bill-criminal:bill-criminal /opt/nashville-software-collective
-cd /opt/nashville-software-collective
 ```
 
-### 2. Clone Repository
+### 2. Configure Passwordless Sudo for Nginx Operations
+
+The deployment pipeline needs to manage nginx configuration files. Configure passwordless sudo for nginx operations:
 
 ```bash
-git clone <repository-url> .
-# Or if repository is private, use SSH:
-# git clone git@github.com:<username>/<repository>.git .
+sudo visudo
 ```
 
-**Note:** Replace `<repository-url>` with the actual GitHub repository URL for the Collective project.
+Add these lines at the end of the file (replace `bill-criminal` with your actual username if different):
 
-### 3. Create GitHub Actions SSH Key (if not already done)
+```
+# Allow nginx config management for automated deployments
+bill-criminal ALL=(ALL) NOPASSWD: /usr/bin/cp /opt/*/nginx-server.conf /etc/nginx/sites-available/*
+bill-criminal ALL=(ALL) NOPASSWD: /usr/bin/ln -sf /etc/nginx/sites-available/* /etc/nginx/sites-enabled/*
+bill-criminal ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t
+bill-criminal ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx
+```
 
-If you haven't already set up SSH keys for GitHub Actions from the Resume project:
+Save and exit (Ctrl+X, then Y, then Enter in nano).
+
+Verify the configuration:
 
 ```bash
-# Generate SSH key for GitHub Actions
-ssh-keygen -t ed25519 -C "github-actions-collective" -f ~/.ssh/github_actions_collective_deploy
+sudo -l
+```
 
-# Copy public key to authorized_keys
-cat ~/.ssh/github_actions_collective_deploy.pub >> ~/.ssh/authorized_keys
+You should see the nginx-related commands listed without requiring a password.
+
+### 3. GitHub Actions SSH Key (if not already done)
+
+If you haven't already set up SSH keys for GitHub Actions from the Resume project, you can reuse the existing key:
+
+```bash
+# Display existing private key to add to GitHub Secrets
+cat ~/.ssh/github_actions_deploy
+
+# Verify public key is in authorized_keys
+grep -f ~/.ssh/github_actions_deploy.pub ~/.ssh/authorized_keys
+```
+
+If the public key is not in `authorized_keys`, add it:
+
+```bash
+cat ~/.ssh/github_actions_deploy.pub >> ~/.ssh/authorized_keys
 chmod 600 ~/.ssh/authorized_keys
-
-# Display private key to add to GitHub Secrets
-cat ~/.ssh/github_actions_collective_deploy
 ```
 
 Copy the private key output and add it to GitHub Secrets (see GitHub Actions Setup section below).
 
-### 4. Build and Start Container
+## Automated Deployment
 
-```bash
-cd /opt/nashville-software-collective
-docker compose up -d --build
-```
+Once the one-time setup is complete, the GitHub Actions workflow automatically handles:
 
-### 5. Verify Container is Running
+- Cloning/pulling the repository
+- Deploying nginx configuration from `nginx-server.conf`
+- Building and deploying Docker containers
+- Managing nginx site symlinks and reloading nginx
 
-```bash
-docker ps | grep nashville-software-collective
-docker logs nashville-software-collective
-```
-
-### 6. Test Application
-
-```bash
-curl http://localhost:8082
-```
-
-You should see the HTML content of the Angular application.
-
-## NGINX Configuration
-
-Create `/etc/nginx/sites-available/nashville-software-collective`:
-
-```nginx
-server {
-    listen 80;
-    server_name nashvillesoftwarecollective.com www.nashvillesoftwarecollective.com;
-
-    location / {
-        proxy_pass http://127.0.0.1:8082;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection keep-alive;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
-Enable site:
-
-```bash
-sudo ln -s /etc/nginx/sites-available/nashville-software-collective /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
-```
+The nginx configuration is version-controlled in the repository as `nginx-server.conf` and is automatically deployed on each push to the `prod` branch.
 
 
-## SSL Certificate Setup
+## SSL Certificate Setup (One-Time)
 
-Obtain SSL certificate for the domain:
+Obtain SSL certificate for the domain (only needs to be done once):
 
 ```bash
 sudo certbot --nginx -d nashvillesoftwarecollective.com -d www.nashvillesoftwarecollective.com --non-interactive --agree-tos --email nashvillesoftwarecollective@gmail.com
 sudo certbot renew --dry-run
 ```
+
+Certbot will automatically update the nginx configuration with SSL settings. After the initial certificate setup, certbot handles renewals automatically via systemd timers.
 
 ## DNS Configuration
 
@@ -144,9 +126,10 @@ The GitHub Actions workflow automatically:
 1. Triggers on push to `prod` branch
 2. SSHs into server
 3. Pulls latest code from GitHub
-4. Builds Docker image on server
-5. Deploys new container using docker-compose
-6. Verifies deployment
+4. Deploys nginx configuration from `nginx-server.conf` (if present)
+5. Builds Docker image on server
+6. Deploys new container using docker-compose
+7. Verifies deployment
 
 ## Deployment
 
@@ -227,8 +210,11 @@ sudo tail -f /var/log/nginx/error.log
 - `public/` - Static assets (constitution.md, favicon)
 - `Dockerfile` - Multi-stage Docker build (Node build + Nginx serve)
 - `docker-compose.yml` - Docker Compose configuration
-- `nginx.conf` - Nginx configuration for Angular SPA routing
+- `nginx.conf` - Nginx configuration **inside the Docker container** for serving the Angular SPA (handles routing, caching, etc.)
+- `nginx-server.conf` - Nginx configuration **on the host server** for reverse proxy (handles SSL, domain routing, proxy to container)
 - `.github/workflows/deploy.yml` - GitHub Actions CI/CD workflow
+
+**Note:** `nginx.conf` is used inside the Docker container, while `nginx-server.conf` is deployed to the host server's nginx. They serve different purposes and both are needed.
 
 ## Maintenance
 
