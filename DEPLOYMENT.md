@@ -39,18 +39,9 @@ sudo visudo
 Add these lines at the end of the file (replace `bill-criminal` with your actual username if different):
 
 ```
-# Allow nginx config management for automated deployments
-bill-criminal ALL=(ALL) NOPASSWD: /usr/bin/cp /opt/*/nginx-server.conf /etc/nginx/sites-available/*
-bill-criminal ALL=(ALL) NOPASSWD: /usr/bin/ln -sf /etc/nginx/sites-available/* /etc/nginx/sites-enabled/*
-bill-criminal ALL=(ALL) NOPASSWD: /usr/bin/rm -f /etc/nginx/sites-enabled/*
-bill-criminal ALL=(ALL) NOPASSWD: /usr/bin/tee /etc/nginx/sites-available/*
-bill-criminal ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t
-bill-criminal ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx
-bill-criminal ALL=(ALL) NOPASSWD: /bin/systemctl start nginx
-# Allow certbot for SSL certificate management
-bill-criminal ALL=(ALL) NOPASSWD: /usr/bin/certbot --nginx *
-# Allow directory cleanup for deployment (only in /opt)
-bill-criminal ALL=(ALL) NOPASSWD: /bin/rm -rf /opt/nashville-software-collective
+# Allow deployment scripts to run with sudo (no password required)
+bill-criminal ALL=(ALL) NOPASSWD: /opt/nashville-software-collective/.github/workflows/deploy-nginx.sh
+bill-criminal ALL=(ALL) NOPASSWD: /opt/williammiller-site/.github/workflows/deploy-nginx.sh
 ```
 
 Save and exit (Ctrl+X, then Y, then Enter in nano).
@@ -61,7 +52,11 @@ Verify the configuration:
 sudo -l
 ```
 
-You should see the nginx-related commands listed without requiring a password.
+You should see the deploy-nginx.sh scripts listed in the output. Test that it works:
+
+```bash
+sudo /opt/nashville-software-collective/.github/workflows/deploy-nginx.sh --help || echo "Script not found yet (will be available after first deployment)"
+```
 
 ### 3. GitHub Actions SSH Key (if not already done)
 

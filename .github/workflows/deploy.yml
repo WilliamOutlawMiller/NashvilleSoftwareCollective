@@ -46,73 +46,32 @@ jobs:
             CERT_EMAIL="${{ env.CERT_EMAIL }}"
             NGINX_SITE_NAME="${{ env.NGINX_SITE_NAME }}"
             
-            # Create directory if it doesn't exist
-            mkdir -p $APP_DIR
-            cd $APP_DIR
-            
             # Prepare git repository URL (use HTTPS, with PAT if available)
             REPO_URL="https://github.com/${{ github.repository }}.git"
             if [ -n "${{ secrets.GITHUB_PAT }}" ]; then
               REPO_URL="https://${{ secrets.GITHUB_PAT }}@github.com/${{ github.repository }}.git"
             fi
             
-            # Handle git repository setup
-            if [ -d .git ]; then
-              echo "Updating existing git repository..."
-              # Check if git repo is valid
-              if ! git rev-parse --git-dir >/dev/null 2>&1; then
-                echo "Git repository is corrupted. Clearing and cloning fresh..."
-                cd ..
-                sudo rm -rf $APP_NAME
-                mkdir -p $APP_NAME
-                cd $APP_NAME
-                git clone $REPO_URL .
-                git checkout prod || git checkout -b prod
-              else
-                # Remove broken origin if it exists but is invalid
-                if ! git remote get-url origin >/dev/null 2>&1; then
-                  git remote remove origin 2>/dev/null || true
-                  git remote add origin $REPO_URL
-                else
-                  git remote set-url origin $REPO_URL
-                fi
-                git fetch origin || { 
-                  echo "ERROR: Failed to fetch from origin. Clearing and cloning fresh..."
-                  cd ..
-                  sudo rm -rf $APP_NAME
-                  mkdir -p $APP_NAME
-                  cd $APP_NAME
-                  git clone $REPO_URL .
-                  git checkout prod || git checkout -b prod
-                }
-                if [ -d .git ]; then
-                  git reset --hard origin/prod || { echo "ERROR: Failed to reset to origin/prod"; exit 1; }
-                  git clean -fd
-                  echo "Git repository updated successfully"
-                fi
-              fi
-            elif [ "$(ls -A . 2>/dev/null)" ]; then
-              echo "Directory exists but is not a git repository. Clearing and cloning fresh..."
-              cd ..
-              sudo rm -rf $APP_NAME
-              mkdir -p $APP_NAME
-              cd $APP_NAME
-              git clone $REPO_URL .
-              git checkout prod || git checkout -b prod
+            # Handle git repository setup using script
+            # First, get the script from the repo (clone to temp location if needed)
+            SCRIPT_PATH=""
+            if [ -d $APP_DIR/.git ] && [ -f $APP_DIR/.github/workflows/deploy-git.sh ]; then
+              SCRIPT_PATH="$APP_DIR/.github/workflows/deploy-git.sh"
             else
-              echo "Cloning repository for first time..."
-              git clone $REPO_URL .
-              git checkout prod || git checkout -b prod
+              # Clone repo to temp location to get the script
+              TEMP_SCRIPT_DIR=$(mktemp -d)
+              git clone $REPO_URL $TEMP_SCRIPT_DIR/repo-scripts 2>/dev/null || true
+              if [ -f $TEMP_SCRIPT_DIR/repo-scripts/.github/workflows/deploy-git.sh ]; then
+                SCRIPT_PATH="$TEMP_SCRIPT_DIR/repo-scripts/.github/workflows/deploy-git.sh"
+              fi
             fi
             
-            echo "Verifying we have the latest code..."
-            git log -1 --oneline
-            echo "Verifying angular.json exists and is valid..."
-            if [ -f angular.json ]; then
-              echo "angular.json found, checking budgets:"
-              grep -A 15 '"budgets"' angular.json || echo "No budgets found"
+            if [ -n "$SCRIPT_PATH" ] && [ -f "$SCRIPT_PATH" ]; then
+              chmod +x "$SCRIPT_PATH"
+              "$SCRIPT_PATH" "$APP_NAME" "$APP_DIR" "$REPO_URL"
+              [ -n "$TEMP_SCRIPT_DIR" ] && rm -rf $TEMP_SCRIPT_DIR 2>/dev/null || true
             else
-              echo "ERROR: angular.json not found!"
+              echo "ERROR: Could not obtain deploy-git.sh script!"
               exit 1
             fi
             
@@ -151,10 +110,10 @@ jobs:
             done
             
             # Deploy nginx configuration and handle SSL certificates
-            if [ -f .github/workflows/deploy-nginx.sh ]; then
-              chmod +x .github/workflows/deploy-nginx.sh
-              .github/workflows/deploy-nginx.sh "$APP_NAME" "$APP_DIR" "$NGINX_SITE_NAME" "$DOMAIN" "$CERT_EMAIL" "$CONTAINER_PORT"
-            elif [ -f nginx-server.conf ]; then
+            if [ -f $APP_DIR/.github/workflows/deploy-nginx.sh ]; then
+              chmod +x $APP_DIR/.github/workflows/deploy-nginx.sh
+              sudo $APP_DIR/.github/workflows/deploy-nginx.sh "$APP_NAME" "$APP_DIR" "$NGINX_SITE_NAME" "$DOMAIN" "$CERT_EMAIL" "$CONTAINER_PORT"
+            elif [ -f $APP_DIR/nginx-server.conf ]; then
               echo "Warning: deploy-nginx.sh not found, nginx config may not be deployed correctly"
             fi
             

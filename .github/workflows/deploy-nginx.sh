@@ -29,10 +29,10 @@ CERT_PATH="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
 
 if [ -f "$CERT_PATH" ]; then
   echo "SSL certificates exist. Deploying full HTTPS configuration..."
-  sudo cp nginx-server.conf /etc/nginx/sites-available/$NGINX_SITE_NAME
+  cp nginx-server.conf /etc/nginx/sites-available/$NGINX_SITE_NAME
 else
   echo "SSL certificates not found. Deploying HTTP-only configuration for certbot..."
-  sudo tee /etc/nginx/sites-available/$NGINX_SITE_NAME > /dev/null << NGINX_EOF
+  tee /etc/nginx/sites-available/$NGINX_SITE_NAME > /dev/null << NGINX_EOF
 server {
     listen 80;
     listen [::]:80;
@@ -58,28 +58,28 @@ server {
 NGINX_EOF
 fi
 
-sudo rm -f /etc/nginx/sites-enabled/$NGINX_SITE_NAME
-sudo ln -s /etc/nginx/sites-available/$NGINX_SITE_NAME /etc/nginx/sites-enabled/$NGINX_SITE_NAME
+rm -f /etc/nginx/sites-enabled/$NGINX_SITE_NAME
+ln -s /etc/nginx/sites-available/$NGINX_SITE_NAME /etc/nginx/sites-enabled/$NGINX_SITE_NAME
 
-if sudo nginx -t; then
-  sudo systemctl reload nginx || sudo systemctl start nginx
+if nginx -t; then
+  systemctl reload nginx || systemctl start nginx
   echo "Nginx configuration deployed successfully"
 else
   echo "ERROR: nginx configuration test failed"
-  sudo nginx -t
+  nginx -t
   exit 1
 fi
 
 if [ ! -f "$CERT_PATH" ]; then
   echo "Running certbot to obtain SSL certificates..."
-  sudo certbot --nginx -d $DOMAIN -d www.$DOMAIN \
+  certbot --nginx -d $DOMAIN -d www.$DOMAIN \
     --non-interactive --agree-tos --email $CERT_EMAIL \
     --redirect || echo "Certbot failed, but continuing deployment. SSL can be configured later."
   
   if [ -f "$CERT_PATH" ]; then
     echo "Certificates obtained. Deploying full HTTPS configuration..."
-    sudo cp nginx-server.conf /etc/nginx/sites-available/$NGINX_SITE_NAME
-    sudo nginx -t && sudo systemctl reload nginx || echo "Warning: Failed to reload nginx with full config"
+    cp nginx-server.conf /etc/nginx/sites-available/$NGINX_SITE_NAME
+    nginx -t && systemctl reload nginx || echo "Warning: Failed to reload nginx with full config"
   fi
 fi
 
