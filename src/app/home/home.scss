@@ -1,0 +1,183 @@
+@use '../../styles.scss' as *;
+
+.hero {
+  background: var(--matte-dark-blue);
+  padding: 5rem 0;
+  border-bottom: 3px solid var(--matte-accent);
+}
+
+.hero-content {
+  max-width: 800px;
+}
+
+.hero h1 {
+  font-size: 3.5rem;
+  margin-bottom: 1rem;
+  border-bottom: none;
+  padding: 0;
+}
+
+.hero-tagline {
+  font-size: 1.5rem;
+  color: var(--matte-accent);
+  margin-bottom: 1.5rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.hero-description {
+  font-size: 1.25rem;
+  line-height: 1.9;
+  margin-bottom: 2.5rem;
+  color: var(--matte-text);
+  max-width: 700px;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.what-we-do {
+  background: var(--matte-bg-light);
+  border-top: 2px solid var(--matte-border);
+  border-bottom: 2px solid var(--matte-border);
+}
+
+.what-we-do h2 {
+  margin-bottom: 3rem;
+}
+
+.activities {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.activity-main,
+.activity-secondary {
+  @include scrollable-card;
+  @include mobile-margin-left;
+  padding: 2rem;
+}
+
+@media (max-width: 768px) {
+  .activity-main,
+  .activity-secondary {
+    padding: 1.5rem;
+  }
+}
+
+.activity-content h3 {
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+}
+
+.activity-content p {
+  font-size: 1.125rem;
+}
+
+.structure-overview {
+  background: var(--matte-dark-blue);
+}
+
+.structure-content {
+  @include content-wrapper;
+}
+
+.structure-text .lead {
+  @include lead-text;
+  margin-bottom: 2.5rem;
+}
+
+.structure-details {
+  @include grid-auto(300px);
+  margin-bottom: 2.5rem;
+}
+
+.structure-detail {
+  @include left-border-item;
+}
+
+.transparency {
+  background: var(--matte-bg-light);
+  border-top: 2px solid var(--matte-border);
+  border-bottom: 2px solid var(--matte-border);
+}
+
+.transparency-content {
+  @include content-wrapper;
+}
+
+.transparency-lead {
+  @include lead-text;
+  margin-bottom: 3rem;
+}
+
+.transparency-features {
+  @include grid-auto(280px);
+}
+
+.transparency-feature {
+  border-top: 2px solid var(--matte-accent);
+  padding-top: 1.5rem;
+}
+
+.branches {
+  background: var(--matte-dark-blue);
+}
+
+.branches-text {
+  font-size: 1.125rem;
+  max-width: 800px;
+}
+
+.join-cta {
+  background: var(--matte-bg-light);
+  border-top: 3px solid var(--matte-accent);
+  text-align: center;
+  
+  h2 {
+    text-align: center;
+  }
+}
+
+.cta-content {
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.cta-content h2 {
+  margin-bottom: 1.5rem;
+}
+
+.cta-content p {
+  font-size: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 768px) {
+  .hero {
+    padding: 3rem 0;
+  }
+
+  .hero h1 {
+    font-size: 2.5rem;
+  }
+
+  .hero-tagline {
+    font-size: 1.25rem;
+  }
+
+  .hero-description {
+    font-size: 1.125rem;
+  }
+
+  .structure-details,
+  .transparency-features {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+}

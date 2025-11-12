@@ -1,0 +1,17 @@
+services:
+  nashville-software-collective:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: nashville-software-collective:latest
+    container_name: nashville-software-collective
+    restart: unless-stopped
+    ports:
+      - "8082:80"
+    networks:
+      - web-network
+
+networks:
+  web-network:
+    driver: bridge
+

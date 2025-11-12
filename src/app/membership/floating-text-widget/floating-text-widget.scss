@@ -1,0 +1,37 @@
+@use '../../../styles.scss' as *;
+
+.interactive-visual {
+  position: relative;
+  width: 100%;
+  height: 400px;
+  background: var(--matte-dark-blue);
+  border: 2px solid var(--matte-border);
+  overflow: hidden;
+  cursor: crosshair;
+  touch-action: none; // Prevent default touch behaviors
+}
+
+.visual-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none; // Prevent scrolling on touch
+}
+
+@media (max-width: 768px) {
+  .interactive-visual {
+    height: 300px;
+    cursor: default;
+  }
+  
+  // Reduce number of particles on mobile for better performance
+  .visual-canvas {
+    // Canvas will handle this programmatically if needed
+  }
+}
+
+@media (max-width: 480px) {
+  .interactive-visual {
+    height: 250px;
+  }
+}

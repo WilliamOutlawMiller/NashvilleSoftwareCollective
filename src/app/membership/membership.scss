@@ -1,0 +1,136 @@
+@use '../../styles.scss' as *;
+
+.membership-hero {
+  @include page-hero;
+}
+
+.membership-content {
+  background: var(--matte-bg-light);
+}
+
+.membership-main {
+  @include content-wrapper;
+}
+
+.membership-intro {
+  margin-bottom: 4rem;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.membership-section {
+  @include content-section;
+}
+
+.benefits {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+.benefit-main,
+.benefit-secondary {
+  @include scrollable-card;
+  @include mobile-margin-left;
+}
+
+.benefit-main h3 {
+  font-size: 1.5rem;
+}
+
+.path-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.path-step {
+  @include left-border-item;
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+  padding-left: 2rem;
+}
+
+.step-marker {
+  background: var(--matte-accent);
+  color: var(--matte-darker-blue);
+  width: 3rem;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  border: 2px solid var(--matte-accent);
+}
+
+.step-content h3 {
+  font-size: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.step-content p {
+  margin: 0;
+  line-height: 1.8;
+}
+
+.requirements {
+  @include grid-auto(250px);
+  margin-top: 2rem;
+}
+
+.requirement-item {
+  @include card;
+}
+
+.cta-section {
+  @include card-accent;
+  padding: 3rem;
+  margin-top: 3rem;
+  text-align: center;
+  
+  h3 {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    color: var(--matte-accent);
+  }
+  
+  p {
+    font-size: 1.125rem;
+    margin-bottom: 2rem;
+  }
+}
+
+.contact-info {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .path-step {
+    flex-direction: column;
+    padding-left: 1.5rem;
+  }
+
+  .step-marker {
+    margin-bottom: 1rem;
+  }
+
+  .requirements {
+    grid-template-columns: 1fr;
+  }
+
+  .cta-section {
+    padding: 2rem 1.5rem;
+    
+    h3 {
+      font-size: 1.5rem;
+    }
+  }
+}

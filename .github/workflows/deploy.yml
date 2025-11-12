@@ -1,0 +1,56 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - prod
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add server to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ secrets.SSH_PORT }} ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to server
+        run: |
+          ssh -p ${{ secrets.SSH_PORT }} ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+            cd /opt/nashville-software-collective
+            
+            # Pull latest code
+            git fetch origin
+            git reset --hard origin/prod
+            
+            # Stop and remove existing container
+            docker compose down || true
+            
+            # Remove old image to force rebuild
+            docker rmi nashville-software-collective:latest || true
+            
+            # Build and start new container
+            docker compose up -d --build
+            
+            # Clean up old images
+            docker image prune -f
+            
+            # Verify deployment
+            sleep 5
+            docker ps | grep nashville-software-collective
+          EOF
+
+      - name: Verify deployment
+        run: |
+          sleep 10
+          curl -f http://${{ secrets.SERVER_HOST }}:8082 || exit 1
+
