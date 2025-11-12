@@ -68,23 +68,39 @@ jobs:
               # Clone repo to temp location to get the script
               echo "Cloning repository to temp location to get deploy-git.sh script..."
               TEMP_SCRIPT_DIR=$(mktemp -d)
-              if git clone $REPO_URL $TEMP_SCRIPT_DIR/repo-scripts; then
-                cd $TEMP_SCRIPT_DIR/repo-scripts
+              echo "Created temp directory: $TEMP_SCRIPT_DIR"
+              
+              if [ -z "$TEMP_SCRIPT_DIR" ] || [ ! -d "$TEMP_SCRIPT_DIR" ]; then
+                echo "ERROR: Failed to create temp directory"
+                exit 1
+              fi
+              
+              CLONE_TARGET="$TEMP_SCRIPT_DIR/repo-scripts"
+              echo "Cloning to: $CLONE_TARGET"
+              
+              if git clone "$REPO_URL" "$CLONE_TARGET"; then
+                cd "$CLONE_TARGET"
                 # Try to checkout prod branch if it exists
                 if git show-ref --verify --quiet refs/remotes/origin/prod 2>/dev/null; then
                   git checkout prod 2>/dev/null || true
                 fi
                 if [ -f .github/workflows/deploy-git.sh ]; then
-                  SCRIPT_PATH="$TEMP_SCRIPT_DIR/repo-scripts/.github/workflows/deploy-git.sh"
+                  SCRIPT_PATH="$CLONE_TARGET/.github/workflows/deploy-git.sh"
                   echo "Found deploy-git.sh script at $SCRIPT_PATH"
                 else
                   echo "ERROR: deploy-git.sh not found in repository after clone"
                   echo "Repository contents:"
                   ls -la .github/workflows/ 2>/dev/null || echo "No .github/workflows directory found"
+                  echo "Current directory: $(pwd)"
+                  echo "Files in repo root:"
+                  ls -la 2>/dev/null || true
                 fi
               else
                 echo "ERROR: Failed to clone repository to get deploy-git.sh script"
                 echo "REPO_URL: $REPO_URL"
+                echo "Clone target: $CLONE_TARGET"
+                echo "Temp dir exists: $([ -d "$TEMP_SCRIPT_DIR" ] && echo 'yes' || echo 'no')"
+                echo "Temp dir writable: $([ -w "$TEMP_SCRIPT_DIR" ] && echo 'yes' || echo 'no')"
               fi
             fi
             
