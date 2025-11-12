@@ -14,6 +14,7 @@ env:
   DOMAIN: nashvillesoftwarecollective.com
   CERT_EMAIL: nashvillesoftwarecollective@gmail.com
   NGINX_SITE_NAME: nashville-software-collective
+  REPO_URL: https://github.com/${{ github.repository }}.git
 
 jobs:
   deploy:
@@ -47,10 +48,13 @@ jobs:
             NGINX_SITE_NAME="${{ env.NGINX_SITE_NAME }}"
             
             # Prepare git repository URL (use HTTPS, with PAT if available)
-            REPO_URL="https://github.com/${{ github.repository }}.git"
-            if [ -n "${{ secrets.GITHUB_PAT }}" ]; then
-              REPO_URL="https://${{ secrets.GITHUB_PAT }}@github.com/${{ github.repository }}.git"
+            REPO_URL="${{ env.REPO_URL }}"
+            GITHUB_PAT="${{ secrets.GITHUB_PAT }}"
+            if [ -n "$GITHUB_PAT" ]; then
+              # Insert PAT into URL: https://PAT@github.com/owner/repo.git
+              REPO_URL=$(echo "$REPO_URL" | sed "s|https://|https://$GITHUB_PAT@|")
             fi
+            echo "Using REPO_URL: ${REPO_URL%%@*}" # Show URL without PAT for security
             
             # Handle git repository setup using script
             # First, get the script from the repo (clone to temp location if needed)
