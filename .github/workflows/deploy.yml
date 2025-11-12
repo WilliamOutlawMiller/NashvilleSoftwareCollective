@@ -58,11 +58,16 @@ jobs:
             
             # Handle git repository setup
             if [ -d .git ]; then
-              git remote remove origin 2>/dev/null || true
-              git remote add origin $REPO_URL || git remote set-url origin $REPO_URL
-              git fetch origin
-              git reset --hard origin/prod
+              echo "Updating existing git repository..."
+              if git remote get-url origin >/dev/null 2>&1; then
+                git remote set-url origin $REPO_URL
+              else
+                git remote add origin $REPO_URL
+              fi
+              git fetch origin || { echo "ERROR: Failed to fetch from origin"; exit 1; }
+              git reset --hard origin/prod || { echo "ERROR: Failed to reset to origin/prod"; exit 1; }
               git clean -fd
+              echo "Git repository updated successfully"
             elif [ "$(ls -A . 2>/dev/null)" ]; then
               echo "Directory exists but is not a git repository. Clearing and cloning fresh..."
               cd ..
@@ -72,8 +77,20 @@ jobs:
               git clone $REPO_URL .
               git checkout prod || git checkout -b prod
             else
+              echo "Cloning repository for first time..."
               git clone $REPO_URL .
               git checkout prod || git checkout -b prod
+            fi
+            
+            echo "Verifying we have the latest code..."
+            git log -1 --oneline
+            echo "Verifying angular.json exists and is valid..."
+            if [ -f angular.json ]; then
+              echo "angular.json found, checking budgets:"
+              grep -A 15 '"budgets"' angular.json || echo "No budgets found"
+            else
+              echo "ERROR: angular.json not found!"
+              exit 1
             fi
             
             # Build and start Docker container first
@@ -83,6 +100,8 @@ jobs:
             
             if ! docker compose up -d --build; then
               echo "ERROR: Docker build or start failed"
+              echo "Checking angular.json on server:"
+              cat angular.json | grep -A 20 '"budgets"' || echo "angular.json not found or invalid"
               docker compose logs
               exit 1
             fi
