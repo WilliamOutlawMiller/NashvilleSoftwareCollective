@@ -66,15 +66,14 @@ jobs:
               SCRIPT_PATH="$APP_DIR/.github/workflows/deploy-git.sh"
             else
               # Clone repo to get the script - use /opt since user has write access there
-              TEMP_SCRIPT_DIR="/opt/tmp-deploy-scripts"
-              mkdir -p "$TEMP_SCRIPT_DIR"
-              git clone "$REPO_URL" "$TEMP_SCRIPT_DIR"
-              cd "$TEMP_SCRIPT_DIR"
+              mkdir -p /opt/tmp-deploy-scripts
+              git clone "$REPO_URL" /opt/tmp-deploy-scripts
+              cd /opt/tmp-deploy-scripts
               if git show-ref --verify --quiet refs/remotes/origin/prod 2>/dev/null; then
                 git checkout prod
               fi
               if [ -f .github/workflows/deploy-git.sh ]; then
-                SCRIPT_PATH="$TEMP_SCRIPT_DIR/.github/workflows/deploy-git.sh"
+                SCRIPT_PATH="/opt/tmp-deploy-scripts/.github/workflows/deploy-git.sh"
               else
                 echo "ERROR: deploy-git.sh not found in repository"
                 exit 1
@@ -83,8 +82,8 @@ jobs:
             
             chmod +x "$SCRIPT_PATH"
             "$SCRIPT_PATH" "$APP_NAME" "$APP_DIR" "$REPO_URL"
-            if [ -n "$TEMP_SCRIPT_DIR" ] && [ "$TEMP_SCRIPT_DIR" != "$APP_DIR" ]; then
-              rm -rf "$TEMP_SCRIPT_DIR"
+            if [ -d /opt/tmp-deploy-scripts ] && [ "/opt/tmp-deploy-scripts" != "$APP_DIR" ]; then
+              rm -rf /opt/tmp-deploy-scripts
             fi
             
             # Build and start Docker container first
