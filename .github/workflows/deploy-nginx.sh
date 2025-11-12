@@ -62,7 +62,11 @@ rm -f /etc/nginx/sites-enabled/$NGINX_SITE_NAME
 ln -s /etc/nginx/sites-available/$NGINX_SITE_NAME /etc/nginx/sites-enabled/$NGINX_SITE_NAME
 
 if nginx -t; then
-  systemctl reload nginx || systemctl start nginx
+  if systemctl is-active --quiet nginx; then
+    systemctl reload nginx
+  else
+    systemctl start nginx
+  fi
   echo "Nginx configuration deployed successfully"
 else
   echo "ERROR: nginx configuration test failed"
