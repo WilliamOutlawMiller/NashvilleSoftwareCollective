@@ -65,10 +65,9 @@ jobs:
               echo "Using existing deploy-git.sh script from $APP_DIR"
               SCRIPT_PATH="$APP_DIR/.github/workflows/deploy-git.sh"
             else
-              # Clone repo to temp location to get the script
-              TEMP_SCRIPT_DIR="/tmp/deploy-$$"
+              # Clone repo to get the script - use /opt since user has write access there
+              TEMP_SCRIPT_DIR="/opt/tmp-deploy-scripts"
               mkdir -p "$TEMP_SCRIPT_DIR"
-              
               git clone "$REPO_URL" "$TEMP_SCRIPT_DIR"
               cd "$TEMP_SCRIPT_DIR"
               if git show-ref --verify --quiet refs/remotes/origin/prod 2>/dev/null; then
@@ -84,7 +83,9 @@ jobs:
             
             chmod +x "$SCRIPT_PATH"
             "$SCRIPT_PATH" "$APP_NAME" "$APP_DIR" "$REPO_URL"
-            rm -rf "$TEMP_SCRIPT_DIR" 2>/dev/null || true
+            if [ -n "$TEMP_SCRIPT_DIR" ] && [ "$TEMP_SCRIPT_DIR" != "$APP_DIR" ]; then
+              rm -rf "$TEMP_SCRIPT_DIR"
+            fi
             
             # Build and start Docker container first
             echo "Building and starting Docker container..."
