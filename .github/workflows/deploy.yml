@@ -113,12 +113,15 @@ jobs:
             
             docker image prune -f
             
+            # Verify container is running
             sleep 5
-            docker ps | grep $CONTAINER_NAME
+            if docker ps | grep -q $CONTAINER_NAME; then
+              echo "✓ Container $CONTAINER_NAME is running"
+              docker ps | grep $CONTAINER_NAME
+            else
+              echo "✗ Container $CONTAINER_NAME is not running"
+              docker ps -a | grep $CONTAINER_NAME
+              exit 1
+            fi
           EOF
-
-      - name: Verify deployment
-        run: |
-          sleep 5
-          curl -f --max-time 10 http://${{ secrets.SERVER_HOST }}:${{ env.CONTAINER_PORT }} || echo "Warning: Container may not be ready yet, but deployment completed"
 
