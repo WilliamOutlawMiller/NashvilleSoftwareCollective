@@ -5,6 +5,16 @@ on:
     branches:
       - prod
 
+env:
+  APP_NAME: nashville-software-collective
+  APP_DIR: /opt/nashville-software-collective
+  DOCKER_IMAGE: nashville-software-collective
+  CONTAINER_NAME: nashville-software-collective
+  CONTAINER_PORT: 8082
+  DOMAIN: nashvillesoftwarecollective.com
+  CERT_EMAIL: nashvillesoftwarecollective@gmail.com
+  NGINX_SITE_NAME: nashville-software-collective
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -25,10 +35,20 @@ jobs:
 
       - name: Deploy to server
         run: |
-          ssh -p ${{ secrets.SSH_PORT }} ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+          ssh -p ${{ secrets.SSH_PORT }} ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << EOF
+            # Application configuration variables
+            APP_NAME="${{ env.APP_NAME }}"
+            APP_DIR="${{ env.APP_DIR }}"
+            DOCKER_IMAGE="${{ env.DOCKER_IMAGE }}"
+            CONTAINER_NAME="${{ env.CONTAINER_NAME }}"
+            CONTAINER_PORT="${{ env.CONTAINER_PORT }}"
+            DOMAIN="${{ env.DOMAIN }}"
+            CERT_EMAIL="${{ env.CERT_EMAIL }}"
+            NGINX_SITE_NAME="${{ env.NGINX_SITE_NAME }}"
+            
             # Create directory if it doesn't exist
-            mkdir -p /opt/nashville-software-collective
-            cd /opt/nashville-software-collective
+            mkdir -p $APP_DIR
+            cd $APP_DIR
             
             # Prepare git repository URL (use HTTPS, with PAT if available)
             REPO_URL="https://github.com/${{ github.repository }}.git"
@@ -38,53 +58,111 @@ jobs:
             
             # Handle git repository setup
             if [ -d .git ]; then
-              # Existing git repository - pull latest code
               git remote set-url origin $REPO_URL || true
               git fetch origin
               git reset --hard origin/prod
               git clean -fd
             elif [ "$(ls -A . 2>/dev/null)" ]; then
-              # Directory exists but is not a git repo - clear and clone fresh
               echo "Directory exists but is not a git repository. Clearing and cloning fresh..."
               cd ..
-              sudo rm -rf nashville-software-collective
-              mkdir -p nashville-software-collective
-              cd nashville-software-collective
+              sudo rm -rf $APP_NAME
+              mkdir -p $APP_NAME
+              cd $APP_NAME
               git clone $REPO_URL .
               git checkout prod || git checkout -b prod
             else
-              # Empty directory - clone fresh
               git clone $REPO_URL .
               git checkout prod || git checkout -b prod
             fi
             
-            # Deploy nginx configuration
-            if [ -f nginx-server.conf ]; then
-              echo "Deploying nginx configuration..."
-              sudo cp nginx-server.conf /etc/nginx/sites-available/nashville-software-collective
-              sudo ln -sf /etc/nginx/sites-available/nashville-software-collective /etc/nginx/sites-enabled/nashville-software-collective
-              sudo nginx -t && sudo systemctl reload nginx || echo "Warning: nginx config test failed"
-            fi
-            
-            # Stop and remove existing container
+            # Build and start Docker container first
+            echo "Building and starting Docker container..."
             docker compose down || true
-            
-            # Remove old image to force rebuild
-            docker rmi nashville-software-collective:latest || true
-            
-            # Build and start new container
+            docker rmi $DOCKER_IMAGE:latest || true
             docker compose up -d --build
             
-            # Clean up old images
+            # Wait for container to be ready
+            echo "Waiting for container to be ready..."
+            sleep 10
+            for i in {1..30}; do
+              if curl -f http://127.0.0.1:$CONTAINER_PORT > /dev/null 2>&1; then
+                echo "Container is ready"
+                break
+              fi
+              echo "Waiting for container... ($i/30)"
+              sleep 2
+            done
+            
+            # Deploy nginx configuration and handle SSL certificates
+            if [ -f nginx-server.conf ]; then
+              echo "Checking SSL certificate status..."
+              CERT_PATH="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
+              
+              if [ -f "$CERT_PATH" ]; then
+                echo "SSL certificates exist. Deploying full HTTPS configuration..."
+                sudo cp nginx-server.conf /etc/nginx/sites-available/$NGINX_SITE_NAME
+              else
+                echo "SSL certificates not found. Deploying HTTP-only configuration for certbot..."
+                sudo tee /etc/nginx/sites-available/$NGINX_SITE_NAME > /dev/null << NGINX_EOF
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $DOMAIN www.$DOMAIN;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+        try_files \$uri =404;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:$CONTAINER_PORT;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection keep-alive;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+NGINX_EOF
+              fi
+              
+              sudo rm -f /etc/nginx/sites-enabled/$NGINX_SITE_NAME
+              sudo ln -s /etc/nginx/sites-available/$NGINX_SITE_NAME /etc/nginx/sites-enabled/$NGINX_SITE_NAME
+              
+              if sudo nginx -t; then
+                sudo systemctl reload nginx || sudo systemctl start nginx
+                echo "Nginx configuration deployed successfully"
+              else
+                echo "ERROR: nginx configuration test failed"
+                sudo nginx -t
+                exit 1
+              fi
+              
+              if [ ! -f "$CERT_PATH" ]; then
+                echo "Running certbot to obtain SSL certificates..."
+                sudo certbot --nginx -d $DOMAIN -d www.$DOMAIN \
+                  --non-interactive --agree-tos --email $CERT_EMAIL \
+                  --redirect || echo "Certbot failed, but continuing deployment. SSL can be configured later."
+                
+                if [ -f "$CERT_PATH" ]; then
+                  echo "Certificates obtained. Deploying full HTTPS configuration..."
+                  sudo cp nginx-server.conf /etc/nginx/sites-available/$NGINX_SITE_NAME
+                  sudo nginx -t && sudo systemctl reload nginx || echo "Warning: Failed to reload nginx with full config"
+                fi
+              fi
+            fi
+            
             docker image prune -f
             
-            # Verify deployment
             sleep 5
-            docker ps | grep nashville-software-collective
+            docker ps | grep $CONTAINER_NAME
           EOF
 
       - name: Verify deployment
         run: |
           sleep 10
-          curl -f http://${{ secrets.SERVER_HOST }}:8082 || exit 1
+          curl -f http://${{ secrets.SERVER_HOST }}:${{ env.CONTAINER_PORT }} || exit 1
 

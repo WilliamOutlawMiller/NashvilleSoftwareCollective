@@ -11,6 +11,8 @@ This document provides instructions for setting up the Nashville Software Collec
 - Application Directory: `/opt/nashville-software-collective`
 - Container Port: `8082` (maps to container port 80)
 
+**Note:** This deployment pipeline uses environment variables at the top of the workflow file for easy customization. To adapt this pipeline for other projects, simply update the `env` section with your project-specific values.
+
 ## Prerequisites
 
 The server should already have Docker and Docker Compose installed (from the Resume site setup). If not, follow the installation steps in the Resume README.md.
@@ -40,8 +42,13 @@ Add these lines at the end of the file (replace `bill-criminal` with your actual
 # Allow nginx config management for automated deployments
 bill-criminal ALL=(ALL) NOPASSWD: /usr/bin/cp /opt/*/nginx-server.conf /etc/nginx/sites-available/*
 bill-criminal ALL=(ALL) NOPASSWD: /usr/bin/ln -sf /etc/nginx/sites-available/* /etc/nginx/sites-enabled/*
+bill-criminal ALL=(ALL) NOPASSWD: /usr/bin/rm -f /etc/nginx/sites-enabled/*
+bill-criminal ALL=(ALL) NOPASSWD: /usr/bin/tee /etc/nginx/sites-available/*
 bill-criminal ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t
 bill-criminal ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx
+bill-criminal ALL=(ALL) NOPASSWD: /bin/systemctl start nginx
+# Allow certbot for SSL certificate management
+bill-criminal ALL=(ALL) NOPASSWD: /usr/bin/certbot --nginx *
 # Allow directory cleanup for deployment (only in /opt)
 bill-criminal ALL=(ALL) NOPASSWD: /bin/rm -rf /opt/nashville-software-collective
 ```
@@ -89,16 +96,16 @@ Once the one-time setup is complete, the GitHub Actions workflow automatically h
 The nginx configuration is version-controlled in the repository as `nginx-server.conf` and is automatically deployed on each push to the `prod` branch.
 
 
-## SSL Certificate Setup (One-Time)
+## SSL Certificate Setup
 
-Obtain SSL certificate for the domain (only needs to be done once):
+SSL certificates are automatically obtained on first deployment. The deployment pipeline:
 
-```bash
-sudo certbot --nginx -d nashvillesoftwarecollective.com -d www.nashvillesoftwarecollective.com --non-interactive --agree-tos --email nashvillesoftwarecollective@gmail.com
-sudo certbot renew --dry-run
-```
+1. Checks if SSL certificates exist
+2. If not, deploys an HTTP-only nginx configuration
+3. Runs certbot to obtain SSL certificates
+4. Deploys the full HTTPS configuration
 
-Certbot will automatically update the nginx configuration with SSL settings. After the initial certificate setup, certbot handles renewals automatically via systemd timers.
+No manual intervention is required. Certbot renewals are handled automatically via systemd timers.
 
 ## DNS Configuration
 
@@ -129,10 +136,22 @@ The GitHub Actions workflow automatically:
 1. Triggers on push to `prod` branch
 2. SSHs into server
 3. Pulls latest code from GitHub
-4. Deploys nginx configuration from `nginx-server.conf` (if present)
-5. Builds Docker image on server
-6. Deploys new container using docker-compose
-7. Verifies deployment
+4. Builds and starts Docker container
+5. Waits for container to be ready
+6. Deploys nginx configuration from `nginx-server.conf` (if present)
+7. Automatically obtains SSL certificates via certbot on first deployment
+8. Reloads nginx with full HTTPS configuration
+9. Verifies deployment
+
+**Pipeline Variables:** The workflow uses environment variables defined at the top of the workflow file for easy customization:
+- `APP_NAME`: Application name (used for directories)
+- `APP_DIR`: Server directory path
+- `DOCKER_IMAGE`: Docker image name
+- `CONTAINER_NAME`: Docker container name
+- `CONTAINER_PORT`: Port the container listens on
+- `DOMAIN`: Primary domain name
+- `CERT_EMAIL`: Email for Let's Encrypt certificates
+- `NGINX_SITE_NAME`: Nginx site configuration name
 
 ## Deployment
 
