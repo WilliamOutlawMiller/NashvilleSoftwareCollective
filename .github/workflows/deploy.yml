@@ -57,18 +57,16 @@ jobs:
             echo "Using REPO_URL: ${REPO_URL%%@*}" # Show URL without PAT for security
             
             # Get the deployment script from the repo
-            TEMP_BASE_DIR="/opt/deploy-temp"
-            TEMP_SCRIPT_DIR="$TEMP_BASE_DIR/$APP_NAME"
-            mkdir -p "$TEMP_BASE_DIR"
-            rm -rf "$TEMP_SCRIPT_DIR"
-            git clone "$REPO_URL" "$TEMP_SCRIPT_DIR"
-            cd "$TEMP_SCRIPT_DIR"
+            mkdir -p /opt/deploy-temp
+            rm -rf /opt/deploy-temp/$APP_NAME
+            git clone "$REPO_URL" /opt/deploy-temp/$APP_NAME
+            cd /opt/deploy-temp/$APP_NAME
             if git show-ref --verify --quiet refs/remotes/origin/prod 2>/dev/null; then
               git checkout prod
             fi
-            chmod +x "$TEMP_SCRIPT_DIR/.github/workflows/deploy-git.sh"
-            "$TEMP_SCRIPT_DIR/.github/workflows/deploy-git.sh" "$APP_NAME" "$APP_DIR" "$REPO_URL"
-            rm -rf "$TEMP_SCRIPT_DIR"
+            chmod +x /opt/deploy-temp/$APP_NAME/.github/workflows/deploy-git.sh
+            /opt/deploy-temp/$APP_NAME/.github/workflows/deploy-git.sh "$APP_NAME" "$APP_DIR" "$REPO_URL"
+            rm -rf /opt/deploy-temp/$APP_NAME
             
             # Build and start Docker container first
             echo "Building and starting Docker container..."
