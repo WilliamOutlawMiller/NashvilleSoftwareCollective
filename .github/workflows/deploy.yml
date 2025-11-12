@@ -58,9 +58,6 @@ jobs:
             
             # Handle git repository setup using script
             # First, get the script from the repo (clone to temp location if needed)
-            SCRIPT_PATH=""
-            TEMP_SCRIPT_DIR=""
-            
             if [ -d $APP_DIR/.git ] && [ -f $APP_DIR/.github/workflows/deploy-git.sh ]; then
               echo "Using existing deploy-git.sh script from $APP_DIR"
               SCRIPT_PATH="$APP_DIR/.github/workflows/deploy-git.sh"
@@ -72,29 +69,31 @@ jobs:
               if git show-ref --verify --quiet refs/remotes/origin/prod 2>/dev/null; then
                 git checkout prod
               fi
-              if [ -f .github/workflows/deploy-git.sh ]; then
-                SCRIPT_PATH="/opt/tmp-deploy-scripts/.github/workflows/deploy-git.sh"
-              else
-                echo "ERROR: deploy-git.sh not found in repository"
+              SCRIPT_PATH="/opt/tmp-deploy-scripts/.github/workflows/deploy-git.sh"
+              if [ ! -f "$SCRIPT_PATH" ]; then
+                echo "ERROR: deploy-git.sh not found at $SCRIPT_PATH"
                 exit 1
               fi
             fi
             
             chmod +x "$SCRIPT_PATH"
             "$SCRIPT_PATH" "$APP_NAME" "$APP_DIR" "$REPO_URL"
+            
+            # Clean up temp directory (only if it's not the app directory)
             if [ -d /opt/tmp-deploy-scripts ] && [ "/opt/tmp-deploy-scripts" != "$APP_DIR" ]; then
-              rm -rf /opt/tmp-deploy-scripts
+              rm -rf /opt/tmp-deploy-scripts 2>/dev/null || true
             fi
             
             # Build and start Docker container first
             echo "Building and starting Docker container..."
+            cd "$APP_DIR"
             docker compose down || true
             docker rmi $DOCKER_IMAGE:latest || true
             
             if ! docker compose up -d --build; then
               echo "ERROR: Docker build or start failed"
               echo "Checking angular.json on server:"
-              cat angular.json | grep -A 20 '"budgets"' || echo "angular.json not found or invalid"
+              cat "$APP_DIR/angular.json" | grep -A 20 '"budgets"' || echo "angular.json not found or invalid"
               docker compose logs
               exit 1
             fi
