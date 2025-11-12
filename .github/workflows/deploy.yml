@@ -58,7 +58,8 @@ jobs:
             
             # Handle git repository setup
             if [ -d .git ]; then
-              git remote set-url origin $REPO_URL || true
+              git remote remove origin 2>/dev/null || true
+              git remote add origin $REPO_URL || git remote set-url origin $REPO_URL
               git fetch origin
               git reset --hard origin/prod
               git clean -fd
@@ -79,17 +80,31 @@ jobs:
             echo "Building and starting Docker container..."
             docker compose down || true
             docker rmi $DOCKER_IMAGE:latest || true
-            docker compose up -d --build
+            
+            if ! docker compose up -d --build; then
+              echo "ERROR: Docker build or start failed"
+              docker compose logs
+              exit 1
+            fi
             
             # Wait for container to be ready
             echo "Waiting for container to be ready..."
             sleep 10
+            
+            CONTAINER_READY=false
             for i in {1..30}; do
-              if curl -f http://127.0.0.1:$CONTAINER_PORT > /dev/null 2>&1; then
+              if docker ps | grep -q $CONTAINER_NAME && curl -f http://127.0.0.1:$CONTAINER_PORT > /dev/null 2>&1; then
                 echo "Container is ready"
+                CONTAINER_READY=true
                 break
               fi
               echo "Waiting for container... ($i/30)"
+              if [ $i -eq 30 ]; then
+                echo "ERROR: Container failed to start or become ready"
+                docker ps -a | grep $CONTAINER_NAME
+                docker logs $CONTAINER_NAME || true
+                exit 1
+              fi
               sleep 2
             done
             

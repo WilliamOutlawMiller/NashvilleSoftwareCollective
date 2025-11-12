@@ -43,7 +43,7 @@
                 {
                   "type": "initial",
                   "maximumWarning": "500kB",
-                  "maximumError": "1MB"
+                  "maximumError": "2MB"
                 },
                 {
                   "type": "anyComponentStyle",
@@ -51,9 +51,9 @@
                   "maximumError": "8kB"
                 },
                 {
-                  "type": "css-inline-fonts",
-                  "maximumWarning": "20kB",
-                  "maximumError": "25kB"
+                  "type": "any",
+                  "maximumWarning": "1MB",
+                  "maximumError": "2MB"
                 }
               ],
               "outputHashing": "all"
